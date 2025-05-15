@@ -13,8 +13,12 @@ st.set_page_config(
 st.title("Stock Market Investment Calculator")
 st.markdown("Calculate potential returns based on your investment strategy.")
 
-# Create two columns for input form
-col1, col2 = st.columns(2)
+# Create tabs for investment and tax inputs
+input_tab1, input_tab2 = st.tabs(["Investment Parameters", "Tax Settings"])
+
+with input_tab1:
+    # Create two columns for investment input form
+    col1, col2 = st.columns(2)
 
 with col1:
     # User inputs
@@ -54,8 +58,72 @@ with col2:
     
     reinvest = st.toggle("Reinvest Initial Investment Plus Gains Each Day", value=True)
 
-# Create a separator
-st.divider()
+    # Create a separator
+    st.divider()
+
+with input_tab2:
+    # Tax settings
+    st.subheader("Tax Settings")
+    
+    col_tax1, col_tax2 = st.columns(2)
+    
+    with col_tax1:
+        # Tax rates
+        federal_tax_rate = st.slider(
+            "Federal Tax Rate (%)",
+            min_value=0.0,
+            max_value=50.0,
+            value=22.0,
+            step=0.5,
+            format="%.1f"
+        )
+        
+        state_tax_rate = st.slider(
+            "State Tax Rate (%)",
+            min_value=0.0,
+            max_value=20.0,
+            value=5.0,
+            step=0.5,
+            format="%.1f"
+        )
+    
+    with col_tax2:
+        # Deductions
+        tax_deductions = st.number_input(
+            "Total Tax Deductions ($)",
+            min_value=0.0,
+            value=0.0,
+            step=100.0,
+            format="%.2f",
+            help="Enter total deductions like trading expenses, software subscriptions, home office, etc."
+        )
+        
+        capital_gains = st.radio(
+            "Tax Type",
+            ["Short-term (Ordinary Income)", "Long-term Capital Gains"],
+            index=0,
+            help="Short-term gains (assets held <1 year) are taxed as ordinary income. Long-term gains (assets held >1 year) typically have lower tax rates."
+        )
+        
+        if capital_gains == "Long-term Capital Gains":
+            long_term_rate = st.slider(
+                "Long-term Capital Gains Rate (%)",
+                min_value=0.0,
+                max_value=30.0,
+                value=15.0,
+                step=0.5,
+                format="%.1f"
+            )
+    
+    # Additional tax information
+    with st.expander("Tax Information"):
+        st.markdown("""
+        ### Tax Considerations:
+        - **Short-term capital gains** (assets held less than a year) are typically taxed as ordinary income
+        - **Long-term capital gains** (assets held more than a year) are usually taxed at lower rates (0%, 15%, or 20% depending on income bracket)
+        - **Deductions** may include trading expenses, software subscriptions, home office deductions, etc.
+        - This calculator provides estimates only. Consult a tax professional for personalized advice.
+        """)
 
 # Calculate button
 if st.button("Calculate Returns", type="primary", use_container_width=True):
@@ -110,6 +178,18 @@ if st.button("Calculate Returns", type="primary", use_container_width=True):
     total_profit = final_amount - initial_investment
     percentage_increase = (total_profit / initial_investment) * 100
     
+    # Calculate taxes
+    taxable_profit = max(0, total_profit - tax_deductions)
+    
+    if capital_gains == "Long-term Capital Gains":
+        federal_tax = taxable_profit * (long_term_rate / 100)
+    else:
+        federal_tax = taxable_profit * (federal_tax_rate / 100)
+        
+    state_tax = taxable_profit * (state_tax_rate / 100)
+    total_tax = federal_tax + state_tax
+    net_profit = total_profit - total_tax
+    
     # Display results
     results_col1, results_col2, results_col3, results_col4 = st.columns(4)
     
@@ -162,6 +242,42 @@ if st.button("Calculate Returns", type="primary", use_container_width=True):
         display_df["Daily Gain"] = display_df["Daily Gain"].map("${:,.2f}".format)
         st.dataframe(display_df, use_container_width=True)
     
+    # Tax breakdown
+    st.subheader("Tax Breakdown")
+    
+    # Create columns for tax metrics
+    tax_col1, tax_col2, tax_col3, tax_col4 = st.columns(4)
+    
+    with tax_col1:
+        st.metric("Gross Profit", f"${total_profit:,.2f}")
+    
+    with tax_col2:
+        st.metric("Taxable Profit", f"${taxable_profit:,.2f}")
+        
+    with tax_col3:
+        st.metric("Total Tax", f"${total_tax:,.2f}")
+        
+    with tax_col4:
+        st.metric("Net Profit", f"${net_profit:,.2f}")
+    
+    # Detailed tax breakdown
+    with st.expander("Detailed Tax Breakdown"):
+        tax_data = {
+            "Category": ["Gross Profit", "Tax Deductions", "Taxable Profit", 
+                        f"Federal Tax ({federal_tax_rate}%)" if capital_gains == "Short-term (Ordinary Income)" else f"Long-term Capital Gains Tax ({long_term_rate}%)", 
+                        f"State Tax ({state_tax_rate}%)", "Total Tax", "Net Profit"],
+            "Amount": [
+                f"${total_profit:,.2f}",
+                f"${tax_deductions:,.2f}",
+                f"${taxable_profit:,.2f}",
+                f"${federal_tax:,.2f}",
+                f"${state_tax:,.2f}",
+                f"${total_tax:,.2f}",
+                f"${net_profit:,.2f}"
+            ]
+        }
+        st.table(pd.DataFrame(tax_data))
+    
     # Display investment strategy summary
     with st.expander("Investment Strategy Summary"):
         strategy_type = "Compounding (Reinvesting)" if reinvest else "Fixed Investment"
@@ -175,7 +291,9 @@ if st.button("Calculate Returns", type="primary", use_container_width=True):
         - **Total Trades per Month**: {trades_per_day * trading_days}
         
         With this strategy, you would turn **${initial_investment:,.2f}** into **${final_amount:,.2f}** in {trading_days} trading days,
-        earning a profit of **${total_profit:,.2f}** ({percentage_increase:.2f}% return).
+        earning a gross profit of **${total_profit:,.2f}** ({percentage_increase:.2f}% return).
+        
+        After taxes and deductions, your net profit would be **${net_profit:,.2f}**.
         """)
 
 # Add some helpful information at the bottom
@@ -186,8 +304,10 @@ with st.expander("How to Use This Calculator"):
     3. Specify how many trading days per month you plan to trade
     4. Set the number of trades you expect to make per day
     5. Toggle whether you want to reinvest your gains each day
-    6. Click "Calculate Returns" to see your potential returns
+    6. Adjust tax settings and deductions in the Tax Settings tab
+    7. Click "Calculate Returns" to see your potential returns
     
     **Note**: This calculator provides an estimate based on consistent returns.
     Actual market results may vary due to volatility, fees, taxes, and other factors.
+    The tax calculations are estimates only and not a substitute for tax advice from a professional.
     """)
