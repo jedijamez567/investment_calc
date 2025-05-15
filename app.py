@@ -44,6 +44,14 @@ with col2:
         step=1
     )
     
+    trades_per_day = st.slider(
+        "Number of Trades per Day",
+        min_value=1,
+        max_value=10,
+        value=1,
+        step=1
+    )
+    
     reinvest = st.toggle("Reinvest Initial Investment Plus Gains Each Day", value=True)
 
 # Create a separator
@@ -59,9 +67,15 @@ if st.button("Calculate Returns", type="primary", use_container_width=True):
     if reinvest:
         # Compound growth with reinvestment (reinvesting initial + gains each day)
         for day in range(1, trading_days + 1):
-            # Calculate daily gain and update current amount
-            daily_gain = current_amount * (percentage_gain / 100)
-            current_amount += daily_gain
+            daily_starting_amount = current_amount
+            
+            # Apply gains for each trade during the day
+            for trade in range(trades_per_day):
+                trade_gain = current_amount * (percentage_gain / 100)
+                current_amount += trade_gain
+            
+            # Calculate total daily gain
+            daily_gain = current_amount - daily_starting_amount
             
             # Store data for visualization
             results_data.append({
@@ -71,7 +85,12 @@ if st.button("Calculate Returns", type="primary", use_container_width=True):
             })
     else:
         # Without reinvestment (just accumulating profits)
-        daily_gain = initial_investment * (percentage_gain / 100)
+        # Calculate gain per trade
+        trade_gain = initial_investment * (percentage_gain / 100)
+        
+        # Calculate daily gain (trade gain × number of trades per day)
+        daily_gain = trade_gain * trades_per_day
+        
         for day in range(1, trading_days + 1):
             # Calculate amount (initial investment stays the same, gains accumulate)
             amount = initial_investment + (daily_gain * day)
@@ -151,7 +170,9 @@ if st.button("Calculate Returns", type="primary", use_container_width=True):
         - **Type**: {strategy_type}
         - **Initial Investment**: ${initial_investment:,.2f}
         - **Target Gain per Trade**: {percentage_gain}%
+        - **Number of Trades per Day**: {trades_per_day}
         - **Trading Days per Month**: {trading_days}
+        - **Total Trades per Month**: {trades_per_day * trading_days}
         
         With this strategy, you would turn **${initial_investment:,.2f}** into **${final_amount:,.2f}** in {trading_days} trading days,
         earning a profit of **${total_profit:,.2f}** ({percentage_increase:.2f}% return).
@@ -163,8 +184,9 @@ with st.expander("How to Use This Calculator"):
     1. Enter your initial investment amount
     2. Set your target percentage gain per trade
     3. Specify how many trading days per month you plan to trade
-    4. Toggle whether you want to reinvest your gains each day
-    5. Click "Calculate Returns" to see your potential returns
+    4. Set the number of trades you expect to make per day
+    5. Toggle whether you want to reinvest your gains each day
+    6. Click "Calculate Returns" to see your potential returns
     
     **Note**: This calculator provides an estimate based on consistent returns.
     Actual market results may vary due to volatility, fees, taxes, and other factors.
